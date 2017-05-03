@@ -1,0 +1,14 @@
+{
+  "name": "endemics",
+  "version": "1.0.0",
+  "description": "",
+  "main": "find-endemics.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Ben Keen",
+  "license": "MIT",
+  "dependencies": {
+    "event-stream": "^3.3.4"
+  }
+}
