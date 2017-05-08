@@ -1,7 +1,7 @@
 {
   "name": "endemics",
   "version": "1.0.0",
-  "description": "",
+  "description": "A script to parse eBird's giant data set and",
   "main": "find-endemics.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -9,6 +9,8 @@
   "author": "Ben Keen",
   "license": "MIT",
   "dependencies": {
-    "event-stream": "^3.3.4"
+    "event-stream": "^3.3.4",
+    "express": "^4.15.2",
+    "mysql": "github:mysqljs/mysql"
   }
 }
