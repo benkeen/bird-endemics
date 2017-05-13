@@ -10,8 +10,16 @@ const util = require('util');
 const es = require('event-stream');
 const db = require('./database');
 
-const SOURCE_FILES = ["./files/file5.txt"];
-const RARITY_MAX_OBS_THRESHOLD = 20;
+const RARITY_MAX_OBS_THRESHOLD = 10;
+
+// ------------------------------------------------------------------------------------------------
+
+const SOURCE_FILE = "./files/file1.txt";
+const hasHeaderRow = true;
+const runStep = 1; // 1: locate all the countries. 2: parse the sightings
+
+// ------------------------------------------------------------------------------------------------
+
 
 
 // memory-friendly way of parsing a giant file, line by line
@@ -26,35 +34,35 @@ const parseFile = function (filename) {
         isRowOne = false;
         return;
       }
-//      if (counter > 10000) {
-//        return;
-//      }
       processRow(line);
 
       if (counter % 500000 === 0) {
-        console.log('- lines processed: ' + counter);
+        console.log('\n --- lines processed: ' + counter + ' ---');
       }
       counter++;
     }))
     .on('end', function() {
-       console.log("The file was processed.");
+      db.saveObsCount();
+      console.log("The file was processed.");
     });
 };
 
+const cache = {};
 
 const processRow = function (line) {
   const parts = line.split(/\t/);
-//  const country_name = parts[10];
-//  const country_code = parts[11];
 
   if (parts.length < 30) {
     console.log('[invalid row data]');
   }
 
-  // for each file, run the code twice, first running maybeAddCountry() with processSighting commented out, then the
-  // opposite. (don't have to do this!)
-  //maybeAddCountry(country_name, country_code);
-  db.processSighting(parts, RARITY_MAX_OBS_THRESHOLD);
+  if (runStep === 1) {
+    const country_name = parts[10];
+    const country_code = parts[11];
+    maybeAddCountry(country_name, country_code);
+  } else if (runStep === 2) {
+    db.processSighting(cache, parts, RARITY_MAX_OBS_THRESHOLD);
+  }
 };
 
 
@@ -69,7 +77,5 @@ const maybeAddCountry = function (country_name, country_code) {
   countries[country_name] = null;
 };
 
-
-parseFile(SOURCE_FILES[0]);
-
-
+// get parsin'
+parseFile(SOURCE_FILE);

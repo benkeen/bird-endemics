@@ -46,7 +46,6 @@ const addNewCountrySpecies = function (countrySpeciesId, parts) {
           country_code = ?,
           common_name = ?,
           sci_name = ?,
-          num_obs = 0,
           over_threshold = 'no'
     `,
     values: [countrySpeciesId, countryCode, commonName, sciName]
@@ -62,53 +61,50 @@ const addNewCountrySpecies = function (countrySpeciesId, parts) {
 
 
 const addSighting = function(countrySpeciesId, parts) {
-//  connection.query({
-//    sql: 'UPDATE country_species SET num_obs = num_obs + 1 WHERE country_species_id = ?',
-//    values: [countrySpeciesId]
-//  }, function (err1, results) {
-//    if (err1) {
-//      return;
-//    }
     connection.query({
       sql: 'INSERT INTO rare_sightings (country_species_id, row_data) VALUES (?, ?)',
       values: [countrySpeciesId, parts.join('\t')]
     }, function (err2, results) {
     });
-//  });
 };
 
 
 const markCountrySpeciesAsComplete = function (countrySpeciesId) {
   connection.query({
-    sql: 'UPDATE country_species SET over_threshold = "yes" WHERE id = ?',
+    sql: 'UPDATE country_species SET over_threshold = "yes" WHERE country_species_id = ?',
     values: [countrySpeciesId]
   }, function (error, results) {
     if (error) {
       console.log('error setting OVER', error);
     }
     connection.query({
-      sql: 'DELETE FROM rare_sightings WHERE id = ?',
+      sql: 'DELETE FROM rare_sightings WHERE country_species_id = ?',
       values: [countrySpeciesId]
     }, function (err2, results) {
-      console.log(`Threshold met for ${countrySpeciesId}. Cleared rare_sightings.`);
+      console.log(`[Cleared sightings for ${countrySpeciesId}]`);
     });
   });
 };
 
 
-const cache = {};
 let id = 1;
 
-const processSighting = function (parts, maxThreshold) {
+const processSighting = function (cache, parts, maxThreshold) {
   let countryCode = parts[11];
   let sciName = parts[4];
 
   let key = countryCode + sciName;
   if (!cache.hasOwnProperty(key)) {
     const newKey = id++;
-    cache[key] = [1, newKey, false]; // count, over-threshold
+
+    cache[key] = [1, newKey, false]; // count, country-region-id, over threshold
     addNewCountrySpecies(newKey, parts);
-  } else if (!cache[key][2]) {
+
+  // if this country-species sighting has already passed the rarity threshold, we're not really that interested.
+  // Just track the number of observation. Once all the sightings are processed we'll update the database
+  } else if (cache[key][2]) {
+    cache[key][0]++;
+  } else {
     cache[key][0]++;
     if (cache[key][0] > maxThreshold) {
       markCountrySpeciesAsComplete(cache[key][1]);
@@ -120,10 +116,34 @@ const processSighting = function (parts, maxThreshold) {
 };
 
 
+/**
+ * Called after all sightings have been processed. This updates the
+ * @param cache
+ */
+const saveObsCount = (cache) => {
+  console.log('STEP 2: saving observation count.');
+
+  for (let key in cache) {
+    console.log(`- id: ${cache[key][1]}, num_obs: ${cache[key][0]}`);
+
+    connection.query({
+      sql: 'UPDATE country_species SET num_obs = ? WHERE country_species_id = ?',
+      values: [cache[key][0], cache[key][1]]
+    }, function (error, results) {
+      if (error) {
+        console.log('error updating num_obs');
+      }
+      console.log(`updated num_obs for ${cache[key][1]}.`);
+    });
+  }
+};
+
+
 module.exports = {
-  addCountry: addCountry,
-  addNewCountrySpecies: addNewCountrySpecies,
-  addSighting: addSighting,
-  markCountrySpeciesAsComplete: markCountrySpeciesAsComplete,
-  processSighting
+  addCountry,
+  addNewCountrySpecies,
+  addSighting,
+  markCountrySpeciesAsComplete,
+  processSighting,
+  saveObsCount
 };
