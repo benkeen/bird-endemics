@@ -55,19 +55,19 @@ const addNewCountrySpecies = function (countrySpeciesId, parts) {
       return;
     }
     // now add the first record for this country
-    addSighting(countrySpeciesId, parts);
+    //addSighting(countrySpeciesId, parts);
   });
 };
 
 
-const addSighting = function(countrySpeciesId, parts) {
-    connection.query({
-      sql: 'INSERT INTO rare_sightings (country_species_id, row_data) VALUES (?, ?)',
-      values: [countrySpeciesId, parts.join('\t')]
-    }, function (err2, results) {
-    });
-};
-
+//const addSighting = function(countrySpeciesId, parts) {
+//    connection.query({
+//      sql: 'INSERT INTO rare_sightings (country_species_id, row_data) VALUES (?, ?)',
+//      values: [countrySpeciesId, parts.join('\t')]
+//    }, function (err2, results) {
+//    });
+//};
+//
 
 const markCountrySpeciesAsComplete = function (countrySpeciesId) {
   connection.query({
@@ -89,14 +89,13 @@ const markCountrySpeciesAsComplete = function (countrySpeciesId) {
 
 let id = 1;
 
-const processSighting = function (cache, parts, maxThreshold) {
+const logCountrySpecies = function (cache, parts, maxThreshold) {
   let countryCode = parts[11];
   let sciName = parts[4];
 
   let key = countryCode + sciName;
   if (!cache.hasOwnProperty(key)) {
     const newKey = id++;
-
     cache[key] = [1, newKey, false]; // count, country-region-id, over threshold
     addNewCountrySpecies(newKey, parts);
 
@@ -107,10 +106,7 @@ const processSighting = function (cache, parts, maxThreshold) {
   } else {
     cache[key][0]++;
     if (cache[key][0] > maxThreshold) {
-      markCountrySpeciesAsComplete(cache[key][1]);
       cache[key][2] = true;
-    } else {
-      addSighting(cache[key][1], parts);
     }
   }
 };
@@ -120,12 +116,14 @@ const processSighting = function (cache, parts, maxThreshold) {
  * Called after all sightings have been processed. This updates the
  * @param cache
  */
-const saveObsCount = (cache) => {
-  console.log('STEP 2: saving observation count.');
+const saveObsCount = (cache, onComplete) => {
+  console.log("\nSTEP 2: saving observation count.\n-----------------------------");
+
+  let total = 0;
+  let runningTotal = 0;
 
   for (let key in cache) {
-    console.log(`- id: ${cache[key][1]}, num_obs: ${cache[key][0]}`);
-
+    total++;
     connection.query({
       sql: 'UPDATE country_species SET num_obs = ? WHERE country_species_id = ?',
       values: [cache[key][0], cache[key][1]]
@@ -133,7 +131,12 @@ const saveObsCount = (cache) => {
       if (error) {
         console.log('error updating num_obs');
       }
-      console.log(`updated num_obs for ${cache[key][1]}.`);
+      runningTotal++;
+
+      if (total === runningTotal) {
+        console.log('-- DONE');
+        onComplete();
+      }
     });
   }
 };
@@ -142,8 +145,8 @@ const saveObsCount = (cache) => {
 module.exports = {
   addCountry,
   addNewCountrySpecies,
-  addSighting,
+  //addSighting,
   markCountrySpeciesAsComplete,
-  processSighting,
+  logCountrySpecies,
   saveObsCount
 };
